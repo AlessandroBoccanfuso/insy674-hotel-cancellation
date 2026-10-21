@@ -7,7 +7,7 @@ This README is the documentation required by the assignment rubric. It follows t
 
 | Section | Owner | Status | Code |
 |---|---|---|---|
-| 1. Frame the Problem and Look at the Big Picture | Eglantine Dupuis | not started | this README |
+| 1. Frame the Problem and Look at the Big Picture | Eglantine Dupuy | not started | this README |
 | 2. Explore the Data | Alessandro Boccanfuso| **done, ready for team review** | `notebooks/01_explore_data.ipynb` |
 | 3. Prepare the Data | _TBD_ | not started | `notebooks/02_...` |
 | 4. Measure and Compare Performance | _TBD_ | not started | `notebooks/03_...` |
@@ -33,7 +33,63 @@ requirements.txt              Python packages
 - **Use the same random seed** (`random_state=67`) so everyone gets the same results.
 
 ## 1. Frame the Problem and Look at the Big Picture
-_To be written by the team. Checklist prompts: objective; how the solution will be used; current workarounds (e.g. blanket overbooking, deposits); supervised vs unsupervised, online vs offline; performance measure and why it matches the business objective._
+
+# Our objective
+
+Hotel rooms are extremely perishable: a room that goes unsold on a given night has zero value forever. Cancellations and no-shows free up rooms the hotel can no longer sell through its usual channels, and the hotel loses that revenue.
+
+Our target customers are hotels and other agencies selling stays. Our goal is to help them recover that revenue without risking double bookings or undercutting their own full-price sales. We will use a dataset of 119,390 bookings across two hotels to build a model that:
+
+- forecasts the rooms freed up per hotel per night,
+- predicts whether a booking will be cancelled, and
+- predicts when that cancellation will happen.
+
+Our model could in turn be used to develop a "Too Good To Go" solution for hotels:
+
+- **Revenue manager dashboard:** expected empty rooms per night with a range (e.g., "likely 8–12 rooms free on Nov 14").
+- **Booking-level risk flags:** which reservations are likely to cancel, so the hotel can confirm with the guest, ask for a deposit, or plan around it. Prior research found that bookings contacted by the hotel cancelled less, so outreach is itself a lever.
+- **Release recommendation:** when to push a room to our channel, at roughly what discount, and through which channel.
+- **Donation tier:** a possible CSR or tax angle for the hotel. When we can confidently predict that a room truly won't sell, we suggest it goes to a fallback tier with a social goal, such as shelters, NGOs, people in need and government partnerships.
+
+# Current solutions and workarounds
+
+- **Revenue management systems (RMS):** already forecast demand and set prices.
+- **Hotel policies:** to mitigate cancellations, hotels implement rigid cancellation policies and overbooking tactics, which can hurt revenue and reputation.
+- **Last-minute marketplaces:** HotelTonight presents a selection of unsold rooms at steep discounts every day at noon local time. A few other solutions have entered the market.
+- **Academic ML work (same dataset authors):** a prototype deployed in two hotels trains a classifier daily to flag "likely to cancel" bookings and compute net demand. Related work reports cancellation prediction accuracy above 90%.
+
+**Our angle:** hotels rarely discount unsold rooms because they fear cannibalizing loyal guests who paid the full price. A forecast tied to a discreet resale channel may address that, but currently no solution does both forecasting and selling. Our solution could fill that gap.
+
+# How will we frame the problem?
+
+**Supervised learning**, with three tasks:
+
+1. **Task 1 (main deliverable):** regression / time series. Forecast rooms free per hotel per night, built by aggregating bookings.
+2. **Task 2 (feeds Task 1):** binary classification on `is_canceled`.
+3. **Task 3:** predict when a cancellation happens (days before arrival), using survival analysis or regression on cancelled bookings.
+
+Design choices:
+
+- **Offline / batch learning** to start (static historical data). In production, retrain on a schedule (e.g., daily).
+- **Several lead times** (e.g., 30, 14, 7 and 1 days out), since hotels decide at different points.
+- **Leakage:** drop `reservation_status` and `reservation_status_date`, because they reveal the outcome.
+- **Split by time, not randomly:** train on earlier arrivals and test on later ones. A random split leaks seasonality and inflates scores.
+
+# How will performance be measured?
+
+- **Forecast:** MAE on rooms free per night, reported by lead time (accuracy at 7–14 days matters more than at 200 days).
+- **Prediction interval coverage:** does "8–12 rooms" contain the truth about as often as claimed?
+- **Classifier:** ROC-AUC, plus precision and recall, with emphasis on precision (falsely predicting a free room leads to double bookings). Not plain accuracy: predicting "never cancels" already scores ≈ 63%.
+- **Calibration** (Brier score, reliability plot), since pricing decisions use the probability itself.
+- **Business metric:** revenue recovered per month vs. the hotel's current approach, net of discounts given and any walked guests.
+
+# Is the performance measure aligned with the objective?
+
+Largely, since the hotel acts on per-night counts, which is what we measure. Some gaps remain:
+
+- **Asymmetric costs:** overestimating free rooms (double booking) likely costs more than underestimating (missed resale). We will consider an asymmetric loss (e.g., quantile forecasting aimed slightly low) or a cost-based threshold.
+- **Timing:** a correct prediction 3 weeks out is worth more than one the day before. Evaluating by lead time partly addresses this.
+- **Model accuracy ≠ business value:** high scores don't prove hotels will act on recommendations. That needs a pilot or A/B test.
 
 **Inputs from the exploration that affect the framing** (see notebook, findings F5, F6, F9):
 - Natural target: `is_canceled` (binary classification), 37.0% of the bookings are cancelled. (27.5% after removing duplicates).
