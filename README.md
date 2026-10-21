@@ -7,7 +7,7 @@ This README is the documentation required by the assignment rubric. It follows t
 
 | Section | Owner | Status | Code |
 |---|---|---|---|
-| 1. Frame the Problem and Look at the Big Picture | Eglantine Dupuy | not started | this README |
+| 1. Frame the Problem and Look at the Big Picture | Eglantine Dupuy | **done, ready for team review** | this README |
 | 2. Explore the Data | Alessandro Boccanfuso| **done, ready for team review** | `notebooks/01_explore_data.ipynb` |
 | 3. Prepare the Data | _TBD_ | not started | `notebooks/02_...` |
 | 4. Measure and Compare Performance | _TBD_ | not started | `notebooks/03_...` |
@@ -91,10 +91,6 @@ Largely, since the hotel acts on per-night counts, which is what we measure. Som
 - **Timing:** a correct prediction 3 weeks out is worth more than one the day before. Evaluating by lead time partly addresses this.
 - **Model accuracy ≠ business value:** high scores don't prove hotels will act on recommendations. That needs a pilot or A/B test.
 
-**Inputs from the exploration that affect the framing** (see notebook, findings F5, F6, F9):
-- Natural target: `is_canceled` (binary classification), 37.0% of the bookings are cancelled. (27.5% after removing duplicates).
-- The team must decide **when the prediction is made** (at booking vs shortly before arrival). It decides which columns are legal features.
-- Accuracy alone is a weak metric (always predicting "no cancel" scores 63%). Use precision/recall/F1 or PR-AUC tied to the cost of an empty room vs an overbooked guest.
 
 ## 2. Explore the Data
 **Where to find the details**
