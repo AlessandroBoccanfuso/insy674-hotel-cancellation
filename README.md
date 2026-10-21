@@ -34,7 +34,7 @@ requirements.txt              Python packages
 
 ## 1. Frame the Problem and Look at the Big Picture
 
-# Our objective
+### Our objective
 
 Hotel rooms are extremely perishable: a room that goes unsold on a given night has zero value forever. Cancellations and no-shows free up rooms the hotel can no longer sell through its usual channels, and the hotel loses that revenue.
 
@@ -51,7 +51,7 @@ Our model could in turn be used to develop a "Too Good To Go" solution for hotel
 - **Release recommendation:** when to push a room to our channel, at roughly what discount, and through which channel.
 - **Donation tier:** a possible CSR or tax angle for the hotel. When we can confidently predict that a room truly won't sell, we suggest it goes to a fallback tier with a social goal, such as shelters, NGOs, people in need and government partnerships.
 
-# Current solutions and workarounds
+### Current solutions and workarounds
 
 - **Revenue management systems (RMS):** already forecast demand and set prices.
 - **Hotel policies:** to mitigate cancellations, hotels implement rigid cancellation policies and overbooking tactics, which can hurt revenue and reputation.
@@ -60,7 +60,7 @@ Our model could in turn be used to develop a "Too Good To Go" solution for hotel
 
 **Our angle:** hotels rarely discount unsold rooms because they fear cannibalizing loyal guests who paid the full price. A forecast tied to a discreet resale channel may address that, but currently no solution does both forecasting and selling. Our solution could fill that gap.
 
-# How will we frame the problem?
+### How will we frame the problem?
 
 **Supervised learning**, with three tasks:
 
@@ -75,7 +75,7 @@ Design choices:
 - **Leakage:** drop `reservation_status` and `reservation_status_date`, because they reveal the outcome.
 - **Split by time, not randomly:** train on earlier arrivals and test on later ones. A random split leaks seasonality and inflates scores.
 
-# How will performance be measured?
+### How will performance be measured?
 
 - **Forecast:** MAE on rooms free per night, reported by lead time (accuracy at 7–14 days matters more than at 200 days).
 - **Prediction interval coverage:** does "8–12 rooms" contain the truth about as often as claimed?
@@ -83,7 +83,7 @@ Design choices:
 - **Calibration** (Brier score, reliability plot), since pricing decisions use the probability itself.
 - **Business metric:** revenue recovered per month vs. the hotel's current approach, net of discounts given and any walked guests.
 
-# Is the performance measure aligned with the objective?
+### Is the performance measure aligned with the objective?
 
 Largely, since the hotel acts on per-night counts, which is what we measure. Some gaps remain:
 
