@@ -35,4 +35,4 @@ Source: Kaggle, *Hotel booking demand* (Antonio, Almeida and Nunes), 119,390 boo
 | `required_car_parking_spaces` | Integer, 0-8 | None | 94% are 0 | **Timing risk / leakage-like.** Every booking with parking is a non-cancel (0% cancel rate). |
 | `total_of_special_requests` | Integer, 0-5 | None | 59% are 0 | **Useful but timing risk.** 0 requests = 48% cancel, 1+ requests = 5-22%. Requests may be added after booking. |
 | `reservation_status` | Categorical (Check-Out, Canceled, No-Show) | None | 63% Check-Out, 36% Canceled, 1% No-Show | **LEAKAGE. Drop.** It is the outcome written as text. Canceled + No-Show = is_canceled exactly. |
-| `reservation_status_date` | Date | None | Jul 2015 to Sep 2017 | **LEAKAGE. Drop.** Date the final status was set. For 95% of canceled bookings it is the cancel date. |
+| `reservation_status_date` | Date | None | Jul 2015 to Sep 2017 | **LEAKAGE as a feature: never use as an input.** Date the final status was set. For 95% of canceled bookings it is the cancel date, so it is the basis for the Task 3 target (days before arrival). |

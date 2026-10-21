@@ -46,23 +46,23 @@ _To be written by the team. Checklist prompts: objective; how the solution will 
 - `docs/data_dictionary.md`: a table describing every column in the dataset.
 
 
-1. `reservation_status` and `reservation_status_date` are both dropped to prevent leakage because they contain what we are trying to predict (cancellation). For example, `reservation_status` spells out canceled or check-out.  
-2. 26.8% of rows are exact duplicates, so we remove them before splitting the data into a test and training set. We do this because some of the duplicates coult fall into both the training and test set, which would show the model the correct answer... The duplicates tend to cancel more, which would also inflate the predicted cancel rate. 
+1. `reservation_status` and `reservation_status_date` are both dropped to prevent leakage because they contain what we are trying to predict (cancellation). For example, `reservation_status` spells out canceled or check-out. `reservation_status_date` is still useful for building the Task 3 target (days between the cancellation date and arrival), but never as an input feature.  
+2. 26.8% of rows are exact duplicates, so we remove them before splitting the data into a test and training set. We do this because some of the duplicates could fall into both the training and test set, which would show the model the correct answer... The duplicates tend to cancel more, which would also inflate the predicted cancel rate. Caveat: the forecast task counts rooms per night, and if these rows are really separate bookings (e.g. several identical rooms booked together), dropping them would undercount demand. There is no booking ID, so we cannot tell (see decision 2). 
 3. Lead time is the cleanest driver: 10% cancel when booked within a week, 68% when booked over a year ahead.
 4. Groups (61%) and Portuguese guests (57%) cancel most; Direct (15%) and Corporate (19%) least.
-5. `deposit_type = Non Refund` cancels 99%**, which goes against common sense. People who lose money by cancelling should cancel less. We should look at results with and without it (F11). It could be an error or a problem with how it is recorded. 
-6. Several columns are only known after booking (parking, assigned room, booking changes, special requests). If we want to predict at the moment of booking, using them is cheating. Same point as **when the prediction is made** from the frame the problem section.  
+5. `deposit_type = Non Refund` cancels 99%, which goes against common sense. People who lose money by cancelling should cancel less. We should look at results with and without it (F11). It could be an error or a problem with how it is recorded. 
+6. Several columns are only known after booking (parking, assigned room, booking changes, special requests). If we want to predict at the moment of booking, using them is cheating. The Frame the Problem section forecasts at several lead times (30, 14, 7 and 1 days out), and the file only stores each booking's final values, so we cannot know what these columns looked like 30 days before arrival. Parking and assigned room should be excluded at every horizon; booking changes and special requests should be excluded or handled with care (see the timing table in notebook section 5).  
 7. Otherwise clean: 4 columns with missing values (company, agent, country, children), and for `agent`/`company` missing means "none" which is real data.
 
 **Open decisions for the team**
 
-| # | Decision | Recommendation |
+| # | Decision | Status and recommendation |
 |---|---|---|
-| 1 | Prediction moment (at booking vs before arrival) | Choose in section 1; drives feature list |
-| 2 | Drop exact duplicates? | Yes, before splitting; run one experiment keeping them |
-| 3 | Keep `deposit_type`? | Keep, report with and without, list as limitation |
-| 4 | Random vs time-based split | Random split in CV; time-based hold-out for the final test set |
-| 5 | Metric | PR-AUC / F1 / recall at a target precision |
+| 1 | Prediction moment | **Settled in Frame the Problem:** forecasts at 30, 14, 7 and 1 days out. Features must be limited to what would be known at each horizon (see finding 6). |
+| 2 | Drop exact duplicates? | **Open.** Dropping them protects the classifier from train/test leakage, but may undercount rooms in the per-night forecast. Recommend: drop for the classifier, run the forecast both ways, then decide. |
+| 3 | Keep `deposit_type`? | Keep, report with and without, list as limitation. |
+| 4 | Random vs time-based split | **Settled in Frame the Problem:** split by time (train on earlier arrivals, test on later). Data covers Jul 2015 to Aug 2017. Use time-ordered cross-validation (not random folds) inside the training period. |
+| 5 | Metric | **Settled in Frame the Problem:** MAE by lead time and interval coverage for the forecast; ROC-AUC, precision (emphasised) and calibration for the classifier; revenue recovered as the business metric. Baseline: "never cancels" scores 63% (72.5% once duplicates are removed). |
 
 ## 3. Prepare the Data
 _To be written. See the transformation table in notebook section 9. Everything must live in a scikit-learn `Pipeline` fit on the training data only._
@@ -75,7 +75,8 @@ _To be written. Randomized search with CV, ensembles, one final evaluation on th
 
 ## Assumptions and limitations (running list for the slides)
 - Two hotels, both in Portugal, 2015 to 2017: results may not transfer.
-- No booking or guest ID, so duplicates cannot be verified as true repeats.
+- No booking or guest ID, so duplicates cannot be verified as true repeats (dropping real ones would undercount rooms in the per-night forecast).
+- Only final booking values are stored, so we cannot reconstruct what was known 30, 14, 7 or 1 days before arrival; columns recorded late (booking changes, special requests) risk leaking future information.
 - `deposit_type` behaves oddly (F11), so the model may learn a data artifact.
 - No price context, events, or capacity data; value estimate will rely on assumed room-night costs.
 
