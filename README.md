@@ -66,13 +66,13 @@ Our model could in turn be used to develop a "Too Good To Go" solution for hotel
 
 1. **Task 1 (main deliverable):** regression / time series. Forecast rooms free per hotel per night, built by aggregating bookings.
 2. **Task 2 (feeds Task 1):** binary classification on `is_canceled`.
-3. **Task 3:** predict when a cancellation happens (days before arrival), using survival analysis or regression on cancelled bookings.
+3. **Task 3 (potential addition):** predict when a cancellation happens (days before arrival), using survival analysis or regression on cancelled bookings.
 
 Design choices:
 
 - **Offline / batch learning** to start (static historical data). In production, retrain on a schedule (e.g., daily).
 - **Several lead times** (e.g., 30, 14, 7 and 1 days out), since hotels decide at different points.
-- **Leakage:** drop `reservation_status` and `reservation_status_date`, because they reveal the outcome.
+- **Leakage:** drop `reservation_status` and `reservation_status_date`, because they reveal the outcome for Task 1 and 2. If Task 3 is undertook it will be added back to be able to predict time of cancelation. 
 - **Split by time, not randomly:** train on earlier arrivals and test on later ones. A random split leaks seasonality and inflates scores.
 
 ### How will performance be measured?
