@@ -10,7 +10,7 @@ This README is the documentation required by the assignment rubric. It follows t
 | 1. Frame the Problem and Look at the Big Picture | Eglantine Dupuy | **done, ready for team review** | this README |
 | 2. Explore the Data | Alessandro Boccanfuso| **done, ready for team review** | `notebooks/01_explore_data.ipynb` |
 | 3. Prepare the Data | Asad Nadeem | done | `notebooks/03_feature_engineering_and_model_shortlist.ipynb_` |
-| 4. Measure and Compare Performance | Logan Jiang, Dario Guo | done | `notebooks/04_Model Cross-Validation` |
+| 4. Measure and Compare Performance | Logan Jiang, Dario Guo | done | `notebooks/04_Model Cross-Validation.ipynb` |
 | 5. Fine-Tune the System | _TBD_ | not started | `notebooks/04_...` |
 
 ## Repository layout
