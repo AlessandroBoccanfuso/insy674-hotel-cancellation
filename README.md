@@ -117,11 +117,37 @@ Largely, since the hotel acts on per-night counts, which is what we measure. Som
 | 5 | Metric | **Settled in Frame the Problem:** MAE by lead time and interval coverage for the forecast; ROC-AUC, precision (emphasised) and calibration for the classifier; revenue recovered as the business metric. Baseline: "never cancels" scores 63% (72.5% once duplicates are removed). |
 
 ## 3. Prepare the Data
-_To be written. See the transformation table in notebook section 9. Everything must live in a scikit-learn `Pipeline` fit on the training data only._
+We prepared the data using the transformation ideas in notebook Section 9 and implemented them in Section 11. From 119,390 original records, we removed 31,994 exact duplicate rows, 166 records with no guests, and one record with negative average daily rate (ADR). This left 87,229 bookings, with a cancellation rate of 27.5%. Zero-ADR and zero-night bookings were retained, with a separate flag identifying zero-night stays. The target was is_canceled, where 1 indicates cancellation and 0 indicates no cancellation.
+
+We sorted the data by arrival date and allocated the earliest 70% of unique arrival dates to training, the next 15% to validation, and the remaining 15% to testing. These percentages refer to dates rather than booking counts.
+![alt text](image.png)
+After record-level cleaning and splitting, feature construction and preprocessing were implemented through BookingFeatureEngineer, ColumnTransformer, and a scikit-learn Pipeline. The main transformations were:
+
+Feature selection: We excluded reservation_status and reservation_status_date, which reveal the outcome, together with assigned_room_type, booking_changes, days_in_waiting_list, required_car_parking_spaces, and total_of_special_requests, whose timing creates a leakage risk for booking-time prediction. Raw company IDs were replaced by has_company; distribution_channel was also excluded.
+
+Missing and categorical values: Missing children counts were filled with zero, missing countries with UNKNOWN, and missing agents with NO_AGENT. We created has_agent and has_company, merged undefined meal categories into SC, and mapped undefined market segments to UNKNOWN.
+
+Feature engineering: We created total nights, total guests, family and baby indicators, weekend-stay ratio, ADR per guest, booking-history indicators and historical cancellation rate. We also added lead-time buckets, log transformations of lead time, ADR and total nights, arrival weekday and weekend indicators, cyclical month features, and hotel–market-segment interactions. Historical variables were assumed to describe bookings preceding the prediction time.
+
+Learned preprocessing: Selected numeric features were capped at their training-set 99.5th percentiles, median-imputed and standardized. Categorical features were one-hot encoded, grouping categories occurring fewer than 100 times in the fitting data into an infrequent category.
+
+All learned cutoffs, medians, scaling parameters and category groupings were fitted on training data only. During cross-validation, the complete preprocessing-and-model pipeline was cloned and refitted within each training fold. Held-out data used the fitted transformations without refitting. The baseline pipeline fitted on the full training period produced 171 encoded features. deposit_type was retained in the reported experiments.
 
 ## 4. Measure and Compare Performance
-_To be written. N-fold CV with mean and std, several model families, error analysis, shortlist of 3 to 5._
+We compared eight algorithms covering linear, margin-based, tree-ensemble, probabilistic and neural-network approaches. All experiments used the same five chronological, expanding-window folds within the training period, with random_state=67 where applicable. Each fold trained on earlier arrival dates and evaluated on the following period, keeping bookings with the same arrival date together. We computed the mean and standard deviation of ROC-AUC, precision, recall, F1 and Brier score across folds. ROC-AUC was the main ranking metric; Brier score was unavailable for Linear SVM because its decision scores were not probabilities. The final test set was reserved for later evaluation.
 
+For each algorithm, we evaluated three feature versions using unchanged model settings: V0 used the baseline features; V1 removed is_domestic, which overlaps with country; and V2 added estimated_stay_value = adr × total_nights to V1. This produced 24 model–feature combinations. Improvements were not consistent across algorithms: Extra Trees improved from 0.8111 to 0.8170 mean AUC between V0 and V2, while MLP retained its highest mean AUC with V0.
+
+The highest-mean-AUC representative for each algorithm is shown below. FP and FN rates come from the separate validation set, using a probability threshold of 0.5 where available and the standard decision boundary for Linear SVM.
+![alt text](image-1.png)
+
+We assessed important variables using validation-set permutation importance, measured as the ROC-AUC decrease after shuffling each engineered feature, repeated five times. 
+
+Removing is_domestic often increased the measured importance of country, consistent with their overlapping information. The added stay-value feature did not provide a consistent improvement across models.
+
+Confusion matrices, subgroup comparisons by hotel and market segment, and confidently incorrect predictions revealed different error patterns. Extra Trees and Random Forest generated few false alarms but missed many cancellations. MLP and Histogram Gradient Boosting reduced missed cancellations at the cost of more false alarms. Gaussian Naive Bayes detected more cancellations but incorrectly flagged 35.53% of non-canceled validation bookings. Some missed cancellations involved short lead times and no previous cancellations, while some false alarms involved long lead times or a cancellation history. Resort Hotel also showed higher missed-cancellation rates in several comparisons. Guest identifiers and prior behavior, detailed cancellation terms, payment information and relative market prices, where available at prediction time, could help distinguish these cases.
+
+We shortlisted Extra Trees V2, MLP V0, Logistic Regression V1 and Histogram Gradient Boosting V2. Extra Trees had the highest mean CV AUC; MLP combined a strong AUC with a different error pattern; LR provided an interpretable linear probability model; and Histogram Gradient Boosting offered a different FP–FN trade-off. Validation error-set Jaccard overlap was 56.2% between Extra Trees and MLP, and 61.0% between Extra Trees and Histogram Gradient Boosting. By comparison, Random Forest overlapped 89.2% with Extra Trees, while Linear SVM overlapped 91.6% with LR. SGD Logistic offered no clear performance advantage, and Gaussian Naive Bayes had weaker AUC and substantially more false alarms. Selection therefore considered performance, interpretability and error diversity together. Variation across time folds remained substantial, so small mean-score differences were interpreted cautiously. These four models were retained for subsequent tuning and final testing.
 ## 5. Fine-Tune the System
 5. Fine-Tune the System
 Implementation: 05_Fine_Tune_and_Forecast_Antonin.ipynb
