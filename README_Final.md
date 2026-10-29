@@ -23,7 +23,7 @@ Team: Boccanfuso, Alessandro · Dupuy, Eglantine · Guo, Dario · Jiang, Logan �
 |---|---|---|---|---|
 | 1. Frame the Problem and Look at the Big Picture | Eglantine Dupuy | done | Section 0 | `notebooks/00_framing_problem.ipynb` |
 | 2. Explore the Data | Alessandro Boccanfuso | done | Sections 1–10 | `notebooks/01_explore_data.ipynb` |
-| 3. Prepare the Data | Asad Nadeem | done | Section 11 | `notebooks/02_data_feature_engneering.ipynb`, `notebooks/03_feature_engineering_and_model_shortlist.ipynb` |
+| 3. Prepare the Data | Asad Nadeem, Yao (Winston) Wang | done | Section 11 | `notebooks/02_data_feature_engneering.ipynb`, `notebooks/03_feature_engineering_and_model_shortlist.ipynb` |
 | 4. Measure and Compare Performance | Logan Jiang, Dario Guo | done | Sections 12–14 | `notebooks/04_Measure_and_Compare_Performance.ipynb` |
 | 5. Fine-Tune the System (and Task 1 forecast) | Antonin Laferrière-Mailfait | done | Sections 15–18 | `notebooks/05_Fine_Tune_and_Forecast_Antonin.ipynb` |
 
