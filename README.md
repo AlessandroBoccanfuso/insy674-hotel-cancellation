@@ -123,8 +123,428 @@ _To be written. See the transformation table in notebook section 9. Everything m
 _To be written. N-fold CV with mean and std, several model families, error analysis, shortlist of 3 to 5._
 
 ## 5. Fine-Tune the System
-_To be written. Randomized search with CV, ensembles, one final evaluation on the untouched test set._
+5. Fine-Tune the System
+Implementation: 05_Fine_Tune_and_Forecast_Antonin.ipynb
 
+5.1 Scope and evaluation design
+
+This section continues from the team's preparation, chronological model comparison, and four-model shortlist. Task 2 predicts the binary is_canceled outcome, which includes both explicit cancellations and no-shows. The additional Task 1 implementation forecasts room-nights released by subsequent explicit pre-arrival cancellations among observed reservations.
+
+For Task 2, we preserved the team's cleaning rules, feature versions, and chronological partitions: 56,132 training bookings, 14,009 validation bookings, and 17,088 test bookings. Five expanding-window folds were constructed within the training period using unique arrival dates. Each fold trained on earlier arrivals and evaluated on a subsequent period. Feature engineering, imputation, outlier capping, category encoding, and scaling were fitted within each fold's pipeline.
+
+Mean CV ROC-AUC was the model-selection criterion. We also recorded fold standard deviation, precision, recall, F1, and Brier score. Classification metrics initially used the default 0.5 decision boundary. CV means are averages of the five fold metrics; the accompanying standard deviations describe variation across periods, not confidence intervals.
+
+5.2 Randomized tuning of models and transformations
+
+We used randomized parameter sampling with the existing five chronological folds. To make the experiments reproducible and recoverable, we used random seed 67 and saved results after every completed fold. An initial broader Extra Trees search was interrupted because individual fits were too expensive; its incomplete results were not used to select a winner. The completed search used a restricted computational budget.
+
+Shortlisted configuration
+
+Randomized alternatives
+
+Untuned reference also evaluated?
+
+Original mean CV AUC
+
+Retained mean CV AUC
+
+Extra Trees V2
+
+6
+
+Yes
+
+0.8170
+
+0.8170
+
+Logistic Regression V1
+
+3
+
+Yes
+
+0.7984
+
+0.7993
+
+Histogram Gradient Boosting V2
+
+2
+
+Yes
+
+0.7932
+
+0.7983
+
+MLP V0
+
+2
+
+Yes
+
+0.8130
+
+0.8130
+
+Feature-version labels refer to the existing feature sets. V1 removes is_domestic while retaining country; V2 additionally introduces estimated stay value (adr × total_nights).
+
+The Extra Trees search varied depth, minimum leaf size, and class weighting, while fixing 90 trees and square-root feature sampling to control runtime. It jointly explored no outlier capping versus 99th- and 99.5th-percentile capping, median versus mean numeric imputation, and rare-category minimum frequencies. These imputation choices apply to missing values reaching the numeric imputers; they do not override domain-based replacements already performed inside the feature engineer.
+
+Logistic regression tuning explored regularization strength, class weighting, and rare-category grouping. Boosting tuning explored learning rate, iteration count, leaf count, minimum leaf size, and L2 regularization. MLP tuning explored hidden-layer size, weight regularization, and initial learning rate, retaining the existing 90-iteration maximum and early stopping.
+
+The retained configurations were:
+
+Extra Trees V2: original settings: 90 trees, maximum depth 18, minimum leaf size 4, square-root feature sampling, and no class weighting. None of the six completed alternatives exceeded its original mean CV AUC.
+
+Logistic Regression V1: C = 0.4340645213116581, no class weighting, and rare-category minimum frequency 100. The AUC improvement was small.
+
+Histogram Gradient Boosting V2: learning rate 0.05, 60 maximum iterations, 15 maximum leaf nodes, minimum leaf size 50, and L2 regularization 0.
+
+MLP V0: one hidden layer of 48 neurons, alpha = 0.01142030649919016, and initial learning rate 0.001. Its observed AUC improvement was negligible at four-decimal precision.
+
+These were bounded searches, not evidence of exhaustive optimization. We retained original settings whenever the completed alternatives did not improve the declared criterion.
+
+5.3 Ensemble comparison
+
+We evaluated two predefined equal-weight soft-voting ensembles using cancellation probabilities for the same held-out bookings in each chronological fold. Constituent pipelines were fitted independently within each fold. We compared the two ensembles with the retained individual configurations.
+
+System
+
+Mean CV ROC-AUC
+
+Fold SD
+
+Precision
+
+Recall
+
+F1
+
+Brier
+
+Extra Trees + MLP
+
+0.8214
+
+0.0737
+
+0.7440
+
+0.2743
+
+0.3796
+
+0.1408
+
+All four models
+
+0.8203
+
+0.0743
+
+0.7431
+
+0.2640
+
+0.3662
+
+0.1420
+
+Extra Trees V2
+
+0.8170
+
+0.0778
+
+0.7634
+
+0.2642
+
+0.3625
+
+0.1383
+
+MLP V0
+
+0.8130
+
+0.0736
+
+0.7068
+
+0.2919
+
+0.3971
+
+0.1492
+
+Logistic Regression V1
+
+0.7993
+
+0.0863
+
+0.6695
+
+0.2693
+
+0.3671
+
+0.1478
+
+Histogram Gradient Boosting V2
+
+0.7983
+
+0.0836
+
+0.7371
+
+0.2670
+
+0.3590
+
+0.1490
+
+We selected the Extra Trees–MLP ensemble by mean CV ROC-AUC. Its 0.0044 improvement over Extra Trees indicates better observed risk ranking, while Extra Trees retained the lowest CV Brier error. The ensemble therefore did not dominate every measure.
+
+5.4 Validation, threshold choice, and final Task 2 evaluation
+
+The selected ensemble was fitted on the original training partition and evaluated on the separate validation period. Validation ROC-AUC was 0.8346 and Brier score was 0.1474. A reliability plot showed imperfect calibration, including underprediction in several middle-to-high probability groups.
+
+Because the project emphasizes avoiding false cancellation flags, we selected a decision threshold by maximizing validation F0.5 over the fixed grid 0.05, 0.10, …, 0.95. F0.5 emphasizes precision but is a development proxy, not an estimated hotel cost function. The selected threshold was 0.45, with the rule predicted probability > 0.45.
+
+After freezing the configurations, equal ensemble weights, and threshold, we refitted both constituent pipelines on all 70,141 development bookings and evaluated the reserved test partition.
+
+System / decision rule
+
+Test ROC-AUC
+
+Brier
+
+Precision
+
+Recall
+
+F1
+
+F0.5
+
+Development-rate probability baseline
+
+0.5000
+
+0.2344
+
+0.0000
+
+0.0000
+
+0.0000
+
+0.0000
+
+Original Extra Trees configuration, threshold 0.50
+
+0.7961
+
+0.1734
+
+0.6763
+
+0.2933
+
+0.4091
+
+0.5362
+
+Selected ensemble, threshold 0.50
+
+0.8040
+
+0.1703
+
+0.6391
+
+0.3966
+
+0.4894
+
+0.5694
+
+Final ensemble, threshold 0.45
+
+0.8040
+
+0.1703
+
+0.6090
+
+0.5196
+
+0.5607
+
+0.5887
+
+The final operating point produced 9,185 true negatives, 1,977 false positives, 2,847 false negatives, and 3,079 true positives. Relative to the ensemble at threshold 0.50, it detected 729 additional cancellations/no-shows with 650 additional false positives. Threshold changes affect decisions, not ROC-AUC or Brier score.
+
+The final ensemble improved observed test AUC and probability error relative to the original Extra Trees configuration. However, precision of 60.9% means that approximately 39.1% of cancellation flags were false alarms. The system supports prioritizing investigation or confirmation; the results do not justify automatically releasing flagged rooms for resale. No model or threshold changes were made in response to these test results.
+
+5.5 Task 1 extension: cancellation-related room-night forecasting
+
+Forecast target. We estimated subsequent explicit pre-arrival cancellations among observed reservations still open at a historical prediction date and covering a particular hotel-night. This differs from total hotel availability: capacity, replacement bookings, and complete inventory were unavailable. No-shows were excluded from this target.
+
+Snapshot construction. Estimated booking date was reconstructed as arrival date minus lead time. Stays were expanded into nights, excluding departure day. A booking-night was eligible if it had already been booked, arrival was still in the future, and its terminal status had not yet been recorded at the end of the prediction date. Cancellations already known at that date were excluded. Dates were treated as end-of-day cutoffs because exact timestamps were unavailable.
+
+Time separation. Initial training nights ran from July 31, 2015 through January 5, 2017, using only terminal outcomes recorded by that fitting cutoff. The common validation-night window was February 5–May 4, 2017, ensuring even 30-day forecast origins followed the training cutoff. Initial training contained 382,025 booking-night-horizon rows, reduced to 368,660 distinct booking-row/origin observations for model fitting.
+
+Conditional model. We reused the retained logistic-regression configuration and fitted fresh weights to the explicit-cancellation snapshot target. We added days until arrival and days since booking. Outcome/status fields and other previously excluded timing-risk columns were withheld from the predictors. This was one fixed conditional-model fit, not another Task 1 hyperparameter search.
+
+The conditional probabilities were summed by hotel, night, and horizon. We compared this forecast with training-period cancellation rates by hotel/horizon and a zero-cancellation forecast. Threshold 0.45 was not applied to the count forecast.
+
+Validation policy. We selected the lowest-MAE method per horizon, with RMSE as the tie-breaker. The zero forecast was selected at one day; the snapshot model was selected at seven, fourteen, and thirty days. The zero forecast is a conservative count prediction selected for MAE, not evidence that cancellations are impossible.
+
+Duplicate sensitivity. We held the risk model, historical rates, and selected methods fixed while counting identical records separately. Validation MAE increased from 0.3090 to 0.4045 at one day, 2.1291 to 2.6552 at seven days, 2.4066 to 3.0429 at fourteen days, and 3.6254 to 4.4869 at thirty days. This shows sensitivity to the counting assumption; it does not establish whether duplicate rows are database repeats or genuine separate reservations.
+
+Final refit and evaluation. We refitted the conditional model using 451,745 distinct booking-row/origin observations with outcomes recorded by May 4, 2017. The selected methods were unchanged. Test nights ran from June 4–August 31, 2017; even the earliest 30-day test origin followed the final fitting cutoff. Evaluation covered 178 hotel-nights per horizon, or 712 hotel-night-horizon records.
+
+Horizon
+
+Frozen method
+
+Test MAE
+
+Historical-rate MAE
+
+Zero-forecast MAE
+
+RMSE
+
+Bias
+
+1 day
+
+Zero forecast
+
+0.2809
+
+0.4652
+
+0.2809
+
+0.5996
+
+−0.2809
+
+7 days
+
+Snapshot model
+
+1.7456
+
+3.2066
+
+2.4045
+
+2.1376
+
++1.1221
+
+14 days
+
+Snapshot model
+
+2.1857
+
+4.5971
+
+6.6236
+
+2.8446
+
+−0.9854
+
+30 days
+
+Snapshot model
+
+3.9414
+
+6.0855
+
+13.2921
+
+5.0549
+
++1.0784
+
+Bias is forecast minus actual. Averaging equally across the four horizons, the frozen policy's test MAE was approximately 2.0384, compared with 3.5886 for historical rates: approximately 43.2% lower error. These averages combine equally sized horizon groups and are calculated from the displayed rounded results.
+
+Uncertainty bands. We used hotel/horizon-specific 5th and 95th percentiles of validation residuals (actual minus selected forecast), rounded count bounds outward, and clipped lower bounds at zero. These are nominal 90% empirical error bands, not formal coverage guarantees.
+
+Horizon
+
+Test coverage
+
+Mean band width, room-nights
+
+1 day
+
+98.31%
+
+1.5000
+
+7 days
+
+99.44%
+
+5.9607
+
+14 days
+
+94.38%
+
+9.2360
+
+30 days
+
+93.82%
+
+15.6404
+
+Coverage exceeded 90% in this test period, with relatively wide bands, particularly at thirty days. We did not tighten the bands after inspecting test coverage.
+
+5.6 Assumptions and limitations
+
+The data represent two Portuguese hotels in 2015–2017; transfer to other properties or current booking behavior is untested.
+
+The team's earlier exploration examined the full raw dataset. Final test performance was reserved for the final assessment, but the project was not fully blind to the test-period data throughout every earlier exploratory stage.
+
+Task 2 follows the team's arrival-date holdout protocol. It is a retrospective classification benchmark, not a fully reconstructed booking-time deployment backtest. Task 1 additionally enforces fitting cutoffs, outcome availability, and later forecast origins.
+
+Snapshot reconstruction remains partial: many attributes are final stored values. Excluding known timing-risk features reduces leakage risk but does not establish that every retained attribute, including deposit and historical-booking fields, was recorded identically at the historical prediction moment.
+
+There is no genuine booking identifier. Duplicate interpretation and the assumption of one room per row directly affect room counts.
+
+Task 1 concerns observed, open pre-arrival reservations. It does not predict future bookings, cancellations already recorded, no-show releases, total occupancy, or rooms remaining unsold after replacement demand.
+
+The conditional forecast model and its historical baseline have different weighting: model fitting uses unique booking/origin observations, while historical rates use room-night exposure. The model is a practical extension whose configuration was reused from Task 2 rather than separately optimized.
+
+The one-day zero forecast minimizes validation MAE but systematically understates nonzero cancellation counts. Longer-horizon forecasts also retain signed bias.
+
+Hotel-night errors and repeated booking contributions are temporally correlated. Fold SDs and empirical interval coverage should not be interpreted as independent-sample statistical guarantees.
+
+Interval residuals came from the earlier validation forecast, before the final refit. The resulting bands have no formal guarantee under changing model fits or booking patterns.
+
+Small search budgets limit conclusions about optimality. The ensemble's small AUC gains were observed, not demonstrated statistically significant.
+
+Cancellation prediction does not demonstrate revenue recovered or safe overbooking. Capacity information, richer historical snapshots, and an operational pilot would be required to assess those business outcomes.
+
+Task 3, cancellation timing prediction, was not implemented in this contribution.
+
+All selected model settings, ensemble weights, decision thresholds, horizon policies, counting assumptions, and interval rules were frozen before final performance assessment. No adjustments were made using the final test results.
 ## Assumptions and limitations (running list for the slides)
 - Two hotels, both in Portugal, 2015 to 2017: results may not transfer.
 - No booking or guest ID, so duplicates cannot be verified as true repeats (dropping real ones would undercount rooms in the per-night forecast).
